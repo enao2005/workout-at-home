@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10分間 ワークアウトタイマー</title>
+<style>
+:root {
+--primary: #FF5722;
+--primary-dark: #E64A19;
+--rest: #4CAF50;
+--rest-dark: #388E3C;
+--bg: #121212;
+--card-bg: #1E1E1E;
+--text: #FFFFFF;
+--text-muted: #B0B0B0;
+}
+body {
+font-family: 'Helvetica Neue', Arial, sans-serif;
+background-color: var(--bg);
+color: var(--text);
+margin: 0;
+padding: 0;
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+.container {
+width: 100%;
+max-width: 600px;
+padding: 20px;
+box-sizing: border-box;
+}
+h1, h2, h3 { text-align: center; }
+​/* セレクター画面 */
+#selection-screen { display: block; }
+.category-title {
+background: #333;
+padding: 10px;
+border-radius: 5px;
+margin-top: 20px;
+}
+.workout-item {
+display: flex;
+align-items: center;
+justify-content: space-between;
+background: var(--card-bg);
+padding: 12px;
+margin-bottom: 8px;
+border-radius: 8px;
+}
+.workout-item label {
+flex-grow: 1;
+cursor: pointer;
+margin-left: 10px;
+}
+.youtube-link {
+color: #FF0000;
+text-decoration: none;
+font-size: 14px;
+font-weight: bold;
+padding: 5px 10px;
+border: 1px solid #FF0000;
+border-radius: 4px;
+}
+.youtube-link:hover {
+background: #FF0000;
+color: #FFF;
+}
+.start-btn {
+width: 100%;
+padding: 15px;
+font-size: 18px;
+font-weight: bold;
+background-color: var(--primary);
+color: white;
+border: none;
+border-radius: 8px;
+cursor: pointer;
+margin-top: 20px;
+position: sticky;
+bottom: 20px;
+}
+.start-btn:disabled {
+background-color: #555;
+cursor: not-allowed;
+}
+​/* ワークアウト画面 */
+#workout-screen { display: none; text-align: center; }
+.timer-circle {
+width: 250px;
+height: 250px;
+border-radius: 50%;
+background: conic-gradient(var(--primary) 100%, #333 0%);
+display: flex;
+align-items: center;
+justify-content: center;
+margin: 30px auto;
+position: relative;
+transition: background 1s linear;
+}
+.timer-inner {
+width: 230px;
+height: 230px;
+border-radius: 50%;
+background: var(--bg);
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+}
+.time-left { font-size: 70px; font-weight: bold; margin: 0; line-height: 1; }
+.phase-text { font-size: 24px; color: var(--primary); font-weight: bold; margin-bottom: 5px;}
+.current-workout { font-size: 28px; font-weight: bold; margin: 20px 0 10px; }
+.next-workout { font-size: 16px; color: var(--text-muted); }
+.description-box {
+background: var(--card-bg);
+padding: 15px;
+border-radius: 8px;
+margin-top: 20px;
+text-align: left;
+font-size: 15px;
+line-height: 1.5;
+}
+.controls { margin-top: 30px; display: flex; justify-content: center; gap: 15px; }
+.ctrl-btn {
+padding: 12px 25px;
+font-size: 16px;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+font-weight: bold;
+}
+.btn-pause { background: #FFC107; color: #000; }
+.btn-stop { background: #F44336; color: #FFF; }
+​/* BGM設定エリア */
+.bgm-settings {
+background: var(--card-bg);
+padding: 15px;
+border-radius: 8px;
+margin-bottom: 20px;
+text-align: center;
+}
+.bgm-settings p { margin: 0 0 10px 0; font-size: 14px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+​<div class="container" id="selection-screen">
+<h1>10分間 ワークアウト</h1>
+<p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
+​<div class="bgm-settings">
+<p>※BGMを鳴らす場合、同じフォルダに以下の2つのファイルを配置してください。
+
+<b>workout-bgm.mp3</b> (ワークアウト用)
+
+<b>rest-bgm.mp3</b> (休憩用)</p>
+<label><input type="checkbox" id="bgm-enable" checked> BGMをオンにする</label>
+</div>
+​<div id="workout-list"></div>
+<button class="start-btn" id="start-btn" disabled>スタート</button>
+</div>
+​<div class="container" id="workout-screen">
+<div class="current-workout" id="current-name">準備中...</div>
+<div class="next-workout" id="next-name"></div>
+​<div class="timer-circle" id="timer-circle">
+<div class="timer-inner">
+<div class="phase-text" id="phase-text">WORKOUT</div>
+<div class="time-left" id="time-left">40</div>
+</div>
+</div>
+​<div class="description-box" id="description-text"></div>
+​<div class="controls">
+<button class="ctrl-btn btn-pause" id="pause-btn">一時停止</button>
+<button class="ctrl-btn btn-stop" id="stop-btn">終了して戻る</button>
+</div>
+</div>
+​<!-- BGM用のオーディオタグ (2種類) -->
+<audio id="workout-bgm" src="workout-bgm.mp3" loop></audio>
+<audio id="rest-bgm" src="rest-bgm.mp3" loop></audio>
+​<script>
+const allWorkouts = [
+// 脚
+{ category: "脚（下半身）", name: "ヒップリフト", desc: "息を吐きながら、かかとで床を押すようにお尻をゆっくり持ち上げます。肩から膝が一直線になる位置で1〜2秒キープし、お尻をキュッと締めます。息を吸いながらゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=ヒップリフト+やり方" },
+{ category: "脚（下半身）", name: "ワイドスクワット", desc: "息を吸いながら、膝がつま先と同じ方向を向くように意識して、お尻を真下に沈めます。太ももが床と平行になる手前で止め、かかとで踏み込んで立ち上がります。", url: "https://www.youtube.com/results?search_query=ワイドスクワット+やり方" },
+{ category: "脚（下半身）", name: "カーフレイズ", desc: "ふくらはぎを意識しながら、かかとをゆっくりと限界まで高く引き上げます。頂点で1秒キープした後、かかとが床につくギリギリまでコントロールして下ろします。", url: "https://www.youtube.com/results?search_query=カーフレイズ+やり方" },
+{ category: "脚（下半身）", name: "ドンキーキック", desc: "片膝を90度に曲げたまま、足裏で天井を押し上げるようにお尻の力で脚を持ち上げます。お尻が収縮するのを感じたら、ゆっくり元の位置に戻します。", url: "https://www.youtube.com/results?search_query=ドンキーキック+やり方" },
+{ category: "脚（下半身）", name: "ファイヤハイドラント", desc: "片膝を90度に曲げたまま、犬がマーキングをするように真横へ脚を開き上げます。限界まで上げたらゆっくりと閉じます。", url: "https://www.youtube.com/results?search_query=ファイヤハイドラント+やり方" },
+{ category: "脚（下半身）", name: "スクワット", desc: "後ろにある見えない椅子に座るようにお尻を後ろへ引きながら、太ももが床と平行になるまでしゃがみます。足の裏全体で床を押して立ち上がります。", url: "https://www.youtube.com/results?search_query=スクワット+やり方+正しい" },
+{ category: "脚（下半身）", name: "ランジ", desc: "片足を大きく前に踏み出し、上体をまっすぐ保ったまま、前後の膝が90度になるまで真下に腰を沈めます。前足のかかとで床を強く蹴り、元の姿勢に戻ります。", url: "https://www.youtube.com/results?search_query=ランジ+やり方" },
+{ category: "脚（下半身）", name: "サイドランジ", desc: "片足を大きく真横へ踏み出し、踏み出した側の膝を曲げてお尻を後ろに引き込みます。踏み出した足で床を蹴って元の位置に戻ります。", url: "https://www.youtube.com/results?search_query=サイドランジ+やり方" },
+{ category: "脚（下半身）", name: "ウォールシット", desc: "背中を壁に沿わせて滑り降り、膝と股関節が90度になる位置で静止します。膝がつま先より前に出ないように足の位置を調整します。", url: "https://www.youtube.com/results?search_query=ウォールシット+やり方" },
+{ category: "脚（下半身）", name: "ブルガリアンスクワット", desc: "前の脚に体重を乗せ、背筋を伸ばしたまま、前膝が90度になるまで腰をまっすぐ下に沈めます。前足のかかとで踏み込んで立ち上がります。", url: "https://www.youtube.com/results?search_query=ブルガリアンスクワット+やり方" },
+// お腹
+{ category: "お腹（体幹）", name: "クランチ", desc: "息を吐きながら、おへそを覗き込むように背中を丸め、肩甲骨が床から離れる位置まで上体を起こします。息を吸いながらゆっくり戻します。", url: "https://www.youtube.com/results?search_query=クランチ+やり方" },
+{ category: "お腹（体幹）", name: "ヒールタッチクランチ", desc: "息を吐きながら、右手で右かかとをタッチするように体を真横に曲げます。次に左手で左かかとをタッチします。これを交互に繰り返します。", url: "https://www.youtube.com/results?search_query=ヒールタッチクランチ+やり方" },
+{ category: "お腹（体幹）", name: "プランク", desc: "腰を浮かせて、頭からかかとまでを板のように一直線にします。お尻が上がったり腰が反ったりしないよう、体を真っ直ぐに保ちます。", url: "https://www.youtube.com/results?search_query=プランク+やり方" },
+{ category: "お腹（体幹）", name: "レッグレイズ", desc: "息を吐きながら床と垂直になるまで両脚を持ち上げます。息を吸いながら、かかとが床につくギリギリのところまでゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=レッグレイズ+やり方" },
+{ category: "お腹（体幹）", name: "ロシアンツイスト", desc: "両手を胸の前で組み、息を吐きながら上半身を右に大きく捻ります。続いて左に捻ります。おへそから上全体を捻るように意識します。", url: "https://www.youtube.com/results?search_query=ロシアンツイスト+やり方" },
+{ category: "お腹（体幹）", name: "サイドプランク", desc: "横向きに寝て肩の下に肘をつき、腰を浮かせて頭から足元まで一直線を作ります。下側の脇腹でお腹を引き上げる意識を持ちます。", url: "https://www.youtube.com/results?search_query=サイドプランク+やり方" },
+{ category: "お腹（体幹）", name: "フラッターキック", desc: "両足を床から浮かせ、膝を伸ばしたまま、水泳のバタ足のように両脚を小刻みに上下に動かし続けます。腰が浮かないように固定します。", url: "https://www.youtube.com/results?search_query=フラッターキック+やり方" },
+{ category: "お腹（体幹）", name: "バイシクルクランチ", desc: "自転車を漕ぐように右膝を胸に引き寄せ、同時に上体を捻って左肘と右膝を近づけます。左右交互にリズミカルに行います。", url: "https://www.youtube.com/results?search_query=バイシクルクランチ+やり方" },
+{ category: "お腹（体幹）", name: "マウンテンクライマー", desc: "腕立て伏せの姿勢から、走るようなイメージで右膝、左膝を交互に胸へ素早く引き寄せます。重心を低く保ちます。", url: "https://www.youtube.com/results?search_query=マウンテンクライマー+やり方" },
+{ category: "お腹（体幹）", name: "V字腹筋", desc: "息を吐きながら、両手と両足を同時に持ち上げ、お尻を支点にして体全体で「V」の字を作ります。ゆっくり元の姿勢に戻ります。", url: "https://www.youtube.com/results?search_query=V字腹筋+やり方" },
+// 背中
+{ category: "背中", name: "バックエクステンション", desc: "息を吐きながら、背中の筋肉を意識してゆっくりと上体をそらし、胸を床から浮かせます。頂点で1秒静止し、ゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=バックエクステンション+やり方" },
+{ category: "背中", name: "タオル・ラットプルダウン", desc: "タオルを両手で張り、息を吐きながら胸の前に向かって引き下げます。肩甲骨を中央にギュッと寄せ、ゆっくり頭上へ戻します。", url: "https://www.youtube.com/results?search_query=タオルラットプルダウン+やり方" },
+{ category: "背中", name: "バードドッグ", desc: "四つんばいから、右腕を前方へ、左足を後方へ、床と平行になるまで同時にまっすぐ伸ばします。数秒キープして戻し、反対も行います。", url: "https://www.youtube.com/results?search_query=バードドッグ+やり方" },
+{ category: "背中", name: "ベントオーバーロウ", desc: "上体を45度前傾させます。息を吐きながら、肩甲骨を中央に寄せて両肘を背中の後ろへ高く引き上げ、ゆっくり腕を戻します。", url: "https://www.youtube.com/results?search_query=ベントオーバーロウ+自重+やり方" },
+{ category: "背中", name: "スーパーマン", desc: "うつ伏せから、息を吐きながら両手と両胸、両足を同時に床から高く持ち上げます。数秒キープし、息を吸いながらゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=スーパーマン+筋トレ+やり方" },
+{ category: "背中", name: "リバース・スノーエンジェル", desc: "胸を浮かせ、両手を前方から円を描くようにお尻の横まで動かします。肩甲骨を強く寄せ、再び前方へ戻します。", url: "https://www.youtube.com/results?search_query=リバーススノーエンジェル+やり方" },
+{ category: "背中", name: "プローン・YTIレイズ", desc: "胸を浮かせ、両手を「Y」の字に開いて持ち上げキープ。次に「T」の字でキープ。最後に「I」の字で体の横に沿わせてキープします。", url: "https://www.youtube.com/results?search_query=プローンYTIレイズ+やり方" },
+{ category: "背中", name: "グッドモーニング", desc: "膝を軽く曲げたまま、お辞儀をするように上体を前に倒します。太もも裏の伸びと背中の緊張を感じたら、起き上がります。", url: "https://www.youtube.com/results?search_query=グッドモーニング+筋トレ+やり方" },
+{ category: "背中", name: "スイマー", desc: "うつ伏せから手足を浮かせ、右手と左足、左手と右足を交互に、水泳のバタ足のようなイメージで素早く上下に動かし続けます。", url: "https://www.youtube.com/results?search_query=スイマー+筋トレ+やり方" },
+{ category: "背中", name: "プランク・ロウ", desc: "腕立て伏せの姿勢から、体幹を固定したまま右手の肘を天井に向けて引き上げます。下ろして次は左手の肘を引き上げます。", url: "https://www.youtube.com/results?search_query=プランクロウ+やり方" }
+];
+​let selectedExercises = [];
+let currentExerciseIndex = 0;
+let timerId = null;
+let timeLeft = 0;
+let isWorkoutPhase = true;
+let isPaused = false;
+​// UI Elements
+const selectionScreen = document.getElementById('selection-screen');
+const workoutScreen = document.getElementById('workout-screen');
+const workoutListDiv = document.getElementById('workout-list');
+const selectCountSpan = document.getElementById('select-count');
+const startBtn = document.getElementById('start-btn');
+const bgmEnableCheck = document.getElementById('bgm-enable');
+const workoutBgmAudio = document.getElementById('workout-bgm');
+const restBgmAudio = document.getElementById('rest-bgm');
+​const currentNameDiv = document.getElementById('current-name');
+const nextNameDiv = document.getElementById('next-name');
+const phaseTextDiv = document.getElementById('phase-text');
+const timeLeftDiv = document.getElementById('time-left');
+const timerCircleDiv = document.getElementById('timer-circle');
+const descriptionBox = document.getElementById('description-text');
+​const pauseBtn = document.getElementById('pause-btn');
+const stopBtn = document.getElementById('stop-btn');
+​// リストの生成
+let currentCategory = "";
+allWorkouts.forEach((wo, index) => {
+if(wo.category !== currentCategory) {
+let catTitle = document.createElement('h3');
+catTitle.className = 'category-title';
+catTitle.innerText = wo.category;
+workoutListDiv.appendChild(catTitle);
+currentCategory = wo.category;
+}
+​let itemDiv = document.createElement('div');
+itemDiv.className = 'workout-item';
+​let checkbox = document.createElement('input');
+checkbox.type = 'checkbox';
+checkbox.id = 'wo-' + index;
+checkbox.value = index;
+checkbox.addEventListener('change', updateSelection);
+​let label = document.createElement('label');
+label.htmlFor = 'wo-' + index;
+label.innerText = wo.name;
+​let link = document.createElement('a');
+link.href = wo.url;
+link.target = '_blank';
+link.className = 'youtube-link';
+link.innerText = '動画';
+​itemDiv.appendChild(checkbox);
+itemDiv.appendChild(label);
+itemDiv.appendChild(link);
+workoutListDiv.appendChild(itemDiv);
+});
+​function updateSelection() {
+const checkboxes = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
+selectCountSpan.innerText = checkboxes.length;
+​if (checkboxes.length === 10) {
+startBtn.disabled = false;
+document.querySelectorAll('#workout-list input[type="checkbox"]:not(:checked)').forEach(cb => cb.disabled = true);
+} else {
+startBtn.disabled = true;
+document.querySelectorAll('#workout-list input[type="checkbox"]').forEach(cb => cb.disabled = false);
+}
+}
+​// 音声読み上げ関数
+function speak(text) {
+if(!('speechSynthesis' in window)) return;
+speechSynthesis.cancel();
+const utterance = new SpeechSynthesisUtterance(text);
+utterance.lang = 'ja-JP';
+speechSynthesis.speak(utterance);
+}
+​// BGMの切り替え・コントロール
+function switchBGM(toWorkout) {
+if(!bgmEnableCheck.checked) return;
+​if(toWorkout) {
+restBgmAudio.pause();
+workoutBgmAudio.play().catch(e => console.log("workout-bgm.mp3が必要です", e));
+} else {
+workoutBgmAudio.pause();
+restBgmAudio.play().catch(e => console.log("rest-bgm.mp3が必要です", e));
+}
+}
+​function pauseBGM() {
+workoutBgmAudio.pause();
+restBgmAudio.pause();
+}
+​function stopBGM() {
+pauseBGM();
+workoutBgmAudio.currentTime = 0;
+restBgmAudio.currentTime = 0;
+}
+​function resumeBGM() {
+switchBGM(isWorkoutPhase);
+}
+​// タイマー管理
+function updateTimerUI() {
+timeLeftDiv.innerText = timeLeft;
+let total = isWorkoutPhase ? 40 : 20;
+let percentage = (timeLeft / total) * 100;
+​if(isWorkoutPhase) {
+timerCircleDiv.style.background = conic-gradient(var(--primary) ${percentage}%, #333 0%);
+phaseTextDiv.innerText = "WORKOUT";
+phaseTextDiv.style.color = "var(--primary)";
+} else {
+timerCircleDiv.style.background = conic-gradient(var(--rest) ${percentage}%, #333 0%);
+phaseTextDiv.innerText = "REST";
+phaseTextDiv.style.color = "var(--rest)";
+}
+}
+​function startTimer() {
+timerId = setInterval(() => {
+if(isPaused) return;
+timeLeft--;
+updateTimerUI();
+​if (isWorkoutPhase) {
+if (timeLeft === 20) speak("残り20秒です。半分経過しました！");
+if (timeLeft === 3) speak("3");
+if (timeLeft === 2) speak("2");
+if (timeLeft === 1) speak("1");
+​if (timeLeft <= 0) {
+isWorkoutPhase = false;
+timeLeft = 20;
+updateTimerUI();
+switchBGM(false);
+​if (currentExerciseIndex < 9) {
+let nextEx = selectedExercises[currentExerciseIndex + 1];
+speak(終了です。休憩です。次は、${nextEx.name}です。);
+} else {
+speak("終了です。すべてのワークアウトが完了しました。お疲れ様でした！");
+stopWorkout();
+return;
+}
+}
+} else {
+if (timeLeft === 3) speak("3");
+if (timeLeft === 2) speak("2");
+if (timeLeft === 1) speak("1");
+​if (timeLeft <= 0) {
+currentExerciseIndex++;
+setupCurrentWorkout();
+}
+}
+}, 1000);
+}
+​function setupCurrentWorkout() {
+isWorkoutPhase = true;
+timeLeft = 40;
+let ex = selectedExercises[currentExerciseIndex];
+​currentNameDiv.innerText = ${currentExerciseIndex + 1}/10: ${ex.name};
+descriptionBox.innerText = 【ポイント】\n${ex.desc};
+​if (currentExerciseIndex < 9) {
+nextNameDiv.innerText = NEXT: ${selectedExercises[currentExerciseIndex + 1].name};
+} else {
+nextNameDiv.innerText = NEXT: なし（最後です！）;
+}
+​updateTimerUI();
+switchBGM(true);
+speak(${ex.name}、スタート！ ${ex.name}。${ex.desc});
+}
+​// ボタンイベント
+startBtn.addEventListener('click', () => {
+const checkboxes = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
+selectedExercises = Array.from(checkboxes).map(cb => allWorkouts[cb.value]);
+​if (selectedExercises.length !== 10) {
+alert("10種目選択してください");
+return;
+}
+​selectionScreen.style.display = 'none';
+workoutScreen.style.display = 'block';
+​currentExerciseIndex = 0;
+isPaused = false;
+​setupCurrentWorkout();
+startTimer();
+});
+​pauseBtn.addEventListener('click', () => {
+isPaused = !isPaused;
+if (isPaused) {
+pauseBtn.innerText = "再開";
+pauseBGM();
+speak("一時停止しました");
+} else {
+pauseBtn.innerText = "一時停止";
+resumeBGM();
+speak("再開します");
+}
+});
+​stopBtn.addEventListener('click', () => {
+if(confirm("ワークアウトを終了して最初に戻りますか？")) {
+stopWorkout();
+}
+});
+​function stopWorkout() {
+clearInterval(timerId);
+speechSynthesis.cancel();
+stopBGM();
+​selectionScreen.style.display = 'block';
+workoutScreen.style.display = 'none';
+​isPaused = false;
+pauseBtn.innerText = "一時停止";
+}
+</script>
+</body>
+</html>
