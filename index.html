@@ -34,7 +34,9 @@
         }
         h1, h2, h3 { text-align: center; }
         
-        #selection-screen { display: block; }
+        #selection-screen, #reorder-screen, #workout-screen { display: none; }
+        #selection-screen { display: block; } /* 初期表示 */
+        
         .category-title {
             background: #333;
             padding: 10px;
@@ -88,7 +90,17 @@
             cursor: not-allowed;
         }
         
-        #workout-screen { display: none; text-align: center; }
+        /* 順番変更画面用 */
+        .reorder-item {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--card-bg-light); padding: 12px; margin-bottom: 8px; border-radius: 6px;
+        }
+        .reorder-btns button {
+            background: #555; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-left: 5px;
+        }
+        .reorder-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ワークアウト画面用 */
         .timer-circle {
             width: 240px;
             height: 240px;
@@ -149,16 +161,18 @@
             line-height: 1.5;
             white-space: pre-wrap;
         }
-        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 15px; }
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
         .ctrl-btn {
-            padding: 12px 25px;
-            font-size: 16px;
+            padding: 12px 15px;
+            font-size: 15px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
+            flex: 1;
         }
         .btn-pause { background: #FFC107; color: #000; }
+        .btn-skip { background: #2196F3; color: #FFF; }
         .btn-stop { background: #F44336; color: #FFF; }
         
         .card-panel {
@@ -208,6 +222,7 @@
 </head>
 <body>
 
+<!-- 1. 選択画面 -->
 <div class="container" id="selection-screen">
     <h1>10分間 ワークアウト</h1>
     <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
@@ -234,9 +249,23 @@
     </div>
 
     <div id="workout-list"></div>
-    <button class="start-btn" id="start-btn" disabled>スタート</button>
+    <button class="start-btn" id="to-reorder-btn" disabled>次へ (順番変更)</button>
 </div>
 
+<!-- 2. 順番変更画面 -->
+<div class="container" id="reorder-screen">
+    <h1>順番の確認・変更</h1>
+    <p style="text-align:center;">矢印ボタンで種目の順番を入れ替えることができます</p>
+    
+    <div class="card-panel" id="reorder-list"></div>
+    
+    <div style="display:flex; gap:10px; margin-top: 20px;">
+        <button class="ctrl-btn btn-pause" id="back-to-selection-btn" style="flex:1;">戻る</button>
+        <button class="start-btn" id="final-start-btn" style="flex:2; margin-top:0;">ワークアウト開始</button>
+    </div>
+</div>
+
+<!-- 3. ワークアウト画面 -->
 <div class="container" id="workout-screen">
     <div class="current-workout" id="current-name">準備中...</div>
     <div class="next-workout" id="next-name"></div>
@@ -256,7 +285,8 @@
     
     <div class="controls">
         <button class="ctrl-btn btn-pause" id="pause-btn">一時停止</button>
-        <button class="ctrl-btn btn-stop" id="stop-btn">終了して戻る</button>
+        <button class="ctrl-btn btn-skip" id="skip-btn">スキップ</button>
+        <button class="ctrl-btn btn-stop" id="stop-btn">終了</button>
     </div>
 </div>
 
@@ -265,8 +295,6 @@
 
 <script>
     const WEIGHT_KG = 100;
-    // 40秒間での消費カロリー: METs * 100 * (40/3600) * 1.05
-    // 20秒休憩(1.5 METs): 1.5 * 100 * (20/3600) * 1.05 ≈ 0.875 kcal
     const REST_CALORIES = 1.5 * WEIGHT_KG * (20 / 3600) * 1.05;
 
     const allWorkouts = [
@@ -313,14 +341,21 @@
     let isPaused = false;
     let accumulatedCalories = 0;
     
-    // スリープ防止用 Wake Lock
     let wakeLock = null;
 
+    // DOM Elements
     const selectionScreen = document.getElementById('selection-screen');
+    const reorderScreen = document.getElementById('reorder-screen');
     const workoutScreen = document.getElementById('workout-screen');
+    
     const workoutListDiv = document.getElementById('workout-list');
     const selectCountSpan = document.getElementById('select-count');
-    const startBtn = document.getElementById('start-btn');
+    const toReorderBtn = document.getElementById('to-reorder-btn');
+    
+    const reorderListDiv = document.getElementById('reorder-list');
+    const finalStartBtn = document.getElementById('final-start-btn');
+    const backToSelectionBtn = document.getElementById('back-to-selection-btn');
+
     const bgmEnableCheck = document.getElementById('bgm-enable');
     const workoutBgmAudio = document.getElementById('workout-bgm');
     const restBgmAudio = document.getElementById('rest-bgm');
@@ -335,11 +370,12 @@
     const streakDisplay = document.getElementById('streak-display');
 
     const pauseBtn = document.getElementById('pause-btn');
+    const skipBtn = document.getElementById('skip-btn');
     const stopBtn = document.getElementById('stop-btn');
     const historyListContainer = document.getElementById('history-list-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
 
-    // リスト作成
+    // リスト作成 (選択画面)
     let currentCategory = "";
     allWorkouts.forEach((wo, index) => {
         if(wo.category !== currentCategory) {
@@ -380,30 +416,77 @@
         selectCountSpan.innerText = checkboxes.length;
 
         if (checkboxes.length === 10) {
-            startBtn.disabled = false;
+            toReorderBtn.disabled = false;
             document.querySelectorAll('#workout-list input[type="checkbox"]:not(:checked)').forEach(cb => cb.disabled = true);
         } else {
-            startBtn.disabled = true;
+            toReorderBtn.disabled = true;
             document.querySelectorAll('#workout-list input[type="checkbox"]').forEach(cb => cb.disabled = false);
         }
     }
+
+    // 順番変更画面のレンダリング
+    function renderReorderList() {
+        reorderListDiv.innerHTML = '';
+        selectedExercises.forEach((ex, index) => {
+            let div = document.createElement('div');
+            div.className = 'reorder-item';
+            
+            let nameSpan = document.createElement('span');
+            nameSpan.innerText = `${index + 1}. ${ex.name}`;
+            
+            let btnDiv = document.createElement('div');
+            btnDiv.className = 'reorder-btns';
+            
+            let upBtn = document.createElement('button');
+            upBtn.innerHTML = '▲';
+            upBtn.disabled = index === 0;
+            upBtn.onclick = () => {
+                [selectedExercises[index-1], selectedExercises[index]] = [selectedExercises[index], selectedExercises[index-1]];
+                renderReorderList();
+            };
+            
+            let downBtn = document.createElement('button');
+            downBtn.innerHTML = '▼';
+            downBtn.disabled = index === selectedExercises.length - 1;
+            downBtn.onclick = () => {
+                [selectedExercises[index], selectedExercises[index+1]] = [selectedExercises[index+1], selectedExercises[index]];
+                renderReorderList();
+            };
+            
+            btnDiv.appendChild(upBtn);
+            btnDiv.appendChild(downBtn);
+            div.appendChild(nameSpan);
+            div.appendChild(btnDiv);
+            reorderListDiv.appendChild(div);
+        });
+    }
+
+    toReorderBtn.addEventListener('click', () => {
+        const checked = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
+        selectedExercises = Array.from(checked).map(cb => allWorkouts[cb.value]);
+        
+        selectionScreen.style.display = 'none';
+        reorderScreen.style.display = 'block';
+        renderReorderList();
+    });
+
+    backToSelectionBtn.addEventListener('click', () => {
+        reorderScreen.style.display = 'none';
+        selectionScreen.style.display = 'block';
+    });
 
     // Wake Lock (スクリーンセーバー・スリープ防止)
     async function requestWakeLock() {
         try {
             if ('wakeLock' in navigator) {
                 wakeLock = await navigator.wakeLock.request('screen');
-                console.log('Screen Wake Lock 取得');
             }
-        } catch (err) {
-            console.error(`Wake Lock エラー: ${err.name}, ${err.message}`);
-        }
+        } catch (err) {}
     }
     
     function releaseWakeLock() {
         if (wakeLock !== null) {
             wakeLock.release().then(() => { wakeLock = null; });
-            console.log('Screen Wake Lock 解除');
         }
     }
     
@@ -413,7 +496,7 @@
         }
     });
 
-    // 音声ガイダンス (読み上げ中はBGMを小さくするダッキング機能付き)
+    // 音声ガイダンスとBGMダッキング
     function speak(text) {
         try {
             if (!('speechSynthesis' in window)) return;
@@ -444,9 +527,7 @@
             };
 
             window.speechSynthesis.speak(utterance);
-        } catch (e) {
-            console.warn("Speech error:", e);
-        }
+        } catch (e) {}
     }
 
     function switchBGM(toWorkout) {
@@ -456,10 +537,10 @@
             restBgmAudio.volume = 1.0;
             if (toWorkout) {
                 restBgmAudio.pause();
-                workoutBgmAudio.play().catch(e => console.log("Workout BGM wait/skip", e));
+                workoutBgmAudio.play().catch(e => {});
             } else {
                 workoutBgmAudio.pause();
-                restBgmAudio.play().catch(e => console.log("Rest BGM wait/skip", e));
+                restBgmAudio.play().catch(e => {});
             }
         } catch (e) {}
     }
@@ -496,26 +577,21 @@
         calorieDisplay.innerText = `累計消費: ${accumulatedCalories.toFixed(1)} kcal`;
     }
     
-    // ストリーク(連続日数)の計算と取得
+    // ストリーク(連続日数)管理
     function getStreak() {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
         let lastDateStr = localStorage.getItem('last_workout_date');
         let currentStreak = parseInt(localStorage.getItem('workout_streak') || '0', 10);
         
-        if (lastDateStr === todayStr) {
-            return currentStreak; // 本日すでに実施済み
-        }
+        if (lastDateStr === todayStr) return currentStreak;
         
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()+1}-${yesterday.getDate()}`;
         
-        if (lastDateStr === yesterdayStr) {
-            return currentStreak + 1; // 連続
-        } else {
-            return 1; // 途切れたので1から
-        }
+        if (lastDateStr === yesterdayStr) return currentStreak + 1;
+        return 1;
     }
     
     function saveStreak(newStreak) {
@@ -529,7 +605,6 @@
         isWorkoutPhase = true;
         timeLeft = 40;
         let ex = selectedExercises[currentExerciseIndex];
-
         const itemCal = ex.mets * WEIGHT_KG * (40 / 3600) * 1.05;
 
         currentNameDiv.innerText = `${currentExerciseIndex + 1}/10: ${ex.name}`;
@@ -562,6 +637,7 @@ ${ex.desc}`;
                 if (timeLeft === 1) speak("1");
 
                 if (timeLeft <= 0) {
+                    // 正規の完了
                     let ex = selectedExercises[currentExerciseIndex];
                     accumulatedCalories += (ex.mets * WEIGHT_KG * (40 / 3600) * 1.05);
 
@@ -591,6 +667,53 @@ ${ex.desc}`;
         }, 1000);
     }
 
+    // スキップボタンの処理
+    skipBtn.addEventListener('click', () => {
+        if(isPaused) {
+            isPaused = false;
+            pauseBtn.innerText = "一時停止";
+        }
+        
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+
+        if (isWorkoutPhase) {
+            // 運動中にスキップした場合、運動した時間分だけカロリーを加算
+            let ex = selectedExercises[currentExerciseIndex];
+            let timeSpent = 40 - timeLeft;
+            accumulatedCalories += (ex.mets * WEIGHT_KG * (timeSpent / 3600) * 1.05);
+            
+            isWorkoutPhase = false;
+            timeLeft = 20;
+            updateTimerUI();
+            switchBGM(false);
+            
+            if (currentExerciseIndex < 9) {
+                let nextEx = selectedExercises[currentExerciseIndex + 1];
+                speak(`スキップしました。休憩です。次は、${nextEx.name}です。`);
+            } else {
+                finishWorkoutSession();
+                return;
+            }
+        } else {
+            // 休憩中にスキップした場合、休憩した時間分だけカロリーを加算
+            let timeSpent = 20 - timeLeft;
+            accumulatedCalories += 1.5 * WEIGHT_KG * (timeSpent / 3600) * 1.05;
+            
+            currentExerciseIndex++;
+            if (currentExerciseIndex < 10) {
+                speak("スキップしました。");
+                setupCurrentWorkout();
+            } else {
+                finishWorkoutSession();
+                return;
+            }
+        }
+        
+        // タイマーをリセットして1秒目から正確にカウントさせる
+        if(timerId) clearInterval(timerId);
+        startTimer();
+    });
+
     function finishWorkoutSession() {
         const total = accumulatedCalories.toFixed(1);
         saveWorkoutRecord(total, selectedExercises.map(e => e.name));
@@ -612,18 +735,12 @@ ${ex.desc}`;
         stopWorkout();
     }
 
-    // ローカルストレージ管理 (履歴)
     function saveWorkoutRecord(totalKcal, names) {
         const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
         const now = new Date();
         const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         
-        history.unshift({
-            date: dateStr,
-            calories: totalKcal,
-            exercises: names
-        });
-
+        history.unshift({ date: dateStr, calories: totalKcal, exercises: names });
         localStorage.setItem('workout_history', JSON.stringify(history));
         renderHistory();
     }
@@ -660,20 +777,15 @@ ${ex.desc}`;
         }
     });
 
-    startBtn.addEventListener('click', () => {
-        const checked = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
-        if (checked.length !== 10) return;
-
-        selectedExercises = Array.from(checked).map(cb => allWorkouts[cb.value]);
+    finalStartBtn.addEventListener('click', () => {
         currentExerciseIndex = 0;
         accumulatedCalories = 0;
         isPaused = false;
         pauseBtn.innerText = "一時停止";
 
-        selectionScreen.style.display = 'none';
+        reorderScreen.style.display = 'none';
         workoutScreen.style.display = 'block';
         
-        // 連続日数表示をセット
         let currentStreak = getStreak();
         if(currentStreak > 0) {
             streakDisplay.style.display = "inline-block";
@@ -722,7 +834,6 @@ ${ex.desc}`;
         renderHistory();
     }
 
-    // 初回履歴表示
     renderHistory();
 </script>
 </body>
