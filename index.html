@@ -221,7 +221,7 @@
 <body>
 
 <div class="container" id="selection-screen">
-    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v3</span></h1>
+    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v4</span></h1>
     <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
     
     <div class="card-panel">
@@ -248,7 +248,7 @@
 </div>
 
 <div class="container" id="reorder-screen">
-    <h1>順番の確認・変更</h1>
+    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">v4</span></h1>
     <p style="text-align:center;">矢印ボタンで種目の順番を入れ替えることができます</p>
     <div class="card-panel" id="reorder-list"></div>
     <div style="display:flex; gap:10px; margin-top: 20px;">
@@ -551,9 +551,7 @@
         const itemCal = ex.mets * WEIGHT_KG * (40 / 3600) * 1.05;
 
         currentNameDiv.innerText = `${currentExerciseIndex + 1}/10: ${ex.name}`;
-        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal
-【ポイント】
-${ex.desc}`;
+        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal\n【ポイント】\n${ex.desc}`;
 
         if (currentExerciseIndex < 9) {
             nextNameDiv.innerText = `NEXT: ${selectedExercises[currentExerciseIndex + 1].name}`;
@@ -652,12 +650,7 @@ ${ex.desc}`;
         
         let streakMsg = streak > 1 ? `${streak}日連続達成です！素晴らしい継続力ですね！` : `今日のワークアウト完了です！`;
         speak(`お疲れ様でした！今日も素晴らしい頑張りでしたね！ ${streakMsg} 総消費カロリーは、約${Math.round(accumulatedCalories)}キロカロリーです。明日も頑張りましょう！`);
-        alert(`🎉 ワークアウト完了！
-
-🔥 ${streak}日連続達成中！
-総消費カロリー: 約 ${total} kcal
-
-記録を保存しました。`);
+        alert(`🎉 ワークアウト完了！\n\n🔥 ${streak}日連続達成中！\n総消費カロリー: 約 ${total} kcal\n\n記録を保存しました。`);
         stopWorkout();
     }
 
@@ -707,14 +700,13 @@ ${ex.desc}`;
             alert("保存する履歴がありません。");
             return;
         }
-        // BOMを付与してExcelやスプレッドシートでの文字化けを防止
-        let csv = "﻿日時,消費カロリー(kcal),実施種目
-";
+        
+        let csv = "\uFEFF日時,消費カロリー(kcal),実施種目\n";
         history.forEach(item => {
-            const exercises = `"${item.exercises.join('、')}"`; // カンマ対策でダブルクォートで囲む
-            csv += `${item.date},${item.calories},${exercises}
-`;
+            const exercises = `"${item.exercises.join('、')}"`;
+            csv += `${item.date},${item.calories},${exercises}\n`;
         });
+        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
@@ -767,3 +759,4 @@ ${ex.desc}`;
 </script>
 </body>
 </html>
+
