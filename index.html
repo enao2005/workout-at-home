@@ -35,7 +35,7 @@
         h1, h2, h3 { text-align: center; }
         
         #selection-screen, #reorder-screen, #workout-screen { display: none; }
-        #selection-screen { display: block; } /* 初期表示 */
+        #selection-screen { display: block; }
         
         .category-title {
             background: #333;
@@ -90,7 +90,6 @@
             cursor: not-allowed;
         }
         
-        /* 順番変更画面用 */
         .reorder-item {
             display: flex; align-items: center; justify-content: space-between;
             background: var(--card-bg-light); padding: 12px; margin-bottom: 8px; border-radius: 6px;
@@ -100,7 +99,6 @@
         }
         .reorder-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        /* ワークアウト画面用 */
         .timer-circle {
             width: 240px;
             height: 240px;
@@ -182,7 +180,6 @@
             margin-bottom: 20px;
         }
         
-        /* 履歴セクション */
         .history-list {
             max-height: 260px;
             overflow-y: auto;
@@ -216,15 +213,15 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-            float: right;
         }
+        .btn-green { background: #4CAF50; }
+        .btn-green:hover { background: #45a049; }
     </style>
 </head>
 <body>
 
-<!-- 1. 選択画面 -->
 <div class="container" id="selection-screen">
-    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">(最新版)</span></h1>
+    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v3</span></h1>
     <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
     
     <div class="card-panel">
@@ -232,40 +229,34 @@
             <label>設定体重: <b>100 kg</b> (固定)</label>
             <label><input type="checkbox" id="bgm-enable"> BGMオン</label>
         </div>
-        <p style="font-size:12px; color:var(--text-muted); margin:8px 0 0 0;">
-            ※BGM使用時は <b>workout-bgm.mp3</b> / <b>rest-bgm.mp3</b> を配置してください。
-        </p>
     </div>
 
-    <!-- 履歴パネル -->
+    <!-- 履歴パネル (CSVエクスポート追加) -->
     <div class="card-panel" id="history-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
             <h3 style="margin:0; font-size:16px;">過去のワークアウト履歴</h3>
-            <button class="clear-btn" id="clear-history-btn">履歴消去</button>
+            <div>
+                <button class="clear-btn btn-green" id="export-csv-btn" style="margin-right: 5px;">CSV保存</button>
+                <button class="clear-btn" id="clear-history-btn">履歴消去</button>
+            </div>
         </div>
-        <div class="history-list" id="history-list-container">
-            <p style="color:var(--text-muted); text-align:center; font-size:13px;" id="no-history-msg">履歴はまだありません</p>
-        </div>
+        <div class="history-list" id="history-list-container"></div>
     </div>
 
     <div id="workout-list"></div>
     <button class="start-btn" id="to-reorder-btn" disabled>次へ (順番変更)</button>
 </div>
 
-<!-- 2. 順番変更画面 -->
 <div class="container" id="reorder-screen">
-    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">(最新版)</span></h1>
+    <h1>順番の確認・変更</h1>
     <p style="text-align:center;">矢印ボタンで種目の順番を入れ替えることができます</p>
-    
     <div class="card-panel" id="reorder-list"></div>
-    
     <div style="display:flex; gap:10px; margin-top: 20px;">
         <button class="ctrl-btn btn-pause" id="back-to-selection-btn" style="flex:1;">戻る</button>
         <button class="start-btn" id="final-start-btn" style="flex:2; margin-top:0;">ワークアウト開始</button>
     </div>
 </div>
 
-<!-- 3. ワークアウト画面 -->
 <div class="container" id="workout-screen">
     <div class="current-workout" id="current-name">準備中...</div>
     <div class="next-workout" id="next-name"></div>
@@ -283,7 +274,6 @@
     
     <div class="description-box" id="description-text"></div>
     
-    <!-- ここにスキップボタンがあります -->
     <div class="controls">
         <button class="ctrl-btn btn-pause" id="pause-btn">一時停止</button>
         <button class="ctrl-btn btn-skip" id="skip-btn">スキップ ⏭</button>
@@ -338,26 +328,21 @@
     let isWorkoutPhase = true;
     let isPaused = false;
     let accumulatedCalories = 0;
-    
     let wakeLock = null;
 
-    // DOM Elements
+    // DOM
     const selectionScreen = document.getElementById('selection-screen');
     const reorderScreen = document.getElementById('reorder-screen');
     const workoutScreen = document.getElementById('workout-screen');
-    
     const workoutListDiv = document.getElementById('workout-list');
     const selectCountSpan = document.getElementById('select-count');
     const toReorderBtn = document.getElementById('to-reorder-btn');
-    
     const reorderListDiv = document.getElementById('reorder-list');
     const finalStartBtn = document.getElementById('final-start-btn');
     const backToSelectionBtn = document.getElementById('back-to-selection-btn');
-
     const bgmEnableCheck = document.getElementById('bgm-enable');
     const workoutBgmAudio = document.getElementById('workout-bgm');
     const restBgmAudio = document.getElementById('rest-bgm');
-
     const currentNameDiv = document.getElementById('current-name');
     const nextNameDiv = document.getElementById('next-name');
     const phaseTextDiv = document.getElementById('phase-text');
@@ -366,14 +351,14 @@
     const descriptionBox = document.getElementById('description-text');
     const calorieDisplay = document.getElementById('calorie-display');
     const streakDisplay = document.getElementById('streak-display');
-
     const pauseBtn = document.getElementById('pause-btn');
     const skipBtn = document.getElementById('skip-btn');
     const stopBtn = document.getElementById('stop-btn');
     const historyListContainer = document.getElementById('history-list-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
 
-    // リスト作成 (選択画面)
+    // リスト作成
     let currentCategory = "";
     allWorkouts.forEach((wo, index) => {
         if(wo.category !== currentCategory) {
@@ -412,7 +397,6 @@
     function updateSelection() {
         const checkboxes = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
         selectCountSpan.innerText = checkboxes.length;
-
         if (checkboxes.length === 10) {
             toReorderBtn.disabled = false;
             document.querySelectorAll('#workout-list input[type="checkbox"]:not(:checked)').forEach(cb => cb.disabled = true);
@@ -422,16 +406,13 @@
         }
     }
 
-    // 順番変更画面のレンダリング
     function renderReorderList() {
         reorderListDiv.innerHTML = '';
         selectedExercises.forEach((ex, index) => {
             let div = document.createElement('div');
             div.className = 'reorder-item';
-            
             let nameSpan = document.createElement('span');
             nameSpan.innerText = `${index + 1}. ${ex.name}`;
-            
             let btnDiv = document.createElement('div');
             btnDiv.className = 'reorder-btns';
             
@@ -462,7 +443,6 @@
     toReorderBtn.addEventListener('click', () => {
         const checked = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
         selectedExercises = Array.from(checked).map(cb => allWorkouts[cb.value]);
-        
         selectionScreen.style.display = 'none';
         reorderScreen.style.display = 'block';
         renderReorderList();
@@ -473,7 +453,6 @@
         selectionScreen.style.display = 'block';
     });
 
-    // Wake Lock
     async function requestWakeLock() {
         try {
             if ('wakeLock' in navigator) {
@@ -489,41 +468,21 @@
     }
     
     document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') {
-            requestWakeLock();
-        }
+        if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
     });
 
-    // 音声ガイダンスとBGMダッキング
     function speak(text) {
         try {
             if (!('speechSynthesis' in window)) return;
             window.speechSynthesis.cancel();
-            
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'ja-JP';
-            
             utterance.onstart = () => {
-                if(bgmEnableCheck.checked) {
-                    workoutBgmAudio.volume = 0.2;
-                    restBgmAudio.volume = 0.2;
-                }
+                if(bgmEnableCheck.checked) { workoutBgmAudio.volume = 0.2; restBgmAudio.volume = 0.2; }
             };
-            
             utterance.onend = () => {
-                if(bgmEnableCheck.checked) {
-                    workoutBgmAudio.volume = 1.0;
-                    restBgmAudio.volume = 1.0;
-                }
+                if(bgmEnableCheck.checked) { workoutBgmAudio.volume = 1.0; restBgmAudio.volume = 1.0; }
             };
-            
-            utterance.onerror = () => {
-                if(bgmEnableCheck.checked) {
-                    workoutBgmAudio.volume = 1.0;
-                    restBgmAudio.volume = 1.0;
-                }
-            };
-
             window.speechSynthesis.speak(utterance);
         } catch (e) {}
     }
@@ -531,38 +490,27 @@
     function switchBGM(toWorkout) {
         if (!bgmEnableCheck.checked) return;
         try {
-            workoutBgmAudio.volume = 1.0;
-            restBgmAudio.volume = 1.0;
+            workoutBgmAudio.volume = 1.0; restBgmAudio.volume = 1.0;
             if (toWorkout) {
-                restBgmAudio.pause();
-                workoutBgmAudio.play().catch(e => {});
+                restBgmAudio.pause(); workoutBgmAudio.play().catch(e => {});
             } else {
-                workoutBgmAudio.pause();
-                restBgmAudio.play().catch(e => {});
+                workoutBgmAudio.pause(); restBgmAudio.play().catch(e => {});
             }
         } catch (e) {}
     }
 
     function pauseBGM() {
-        try {
-            workoutBgmAudio.pause();
-            restBgmAudio.pause();
-        } catch (e) {}
+        try { workoutBgmAudio.pause(); restBgmAudio.pause(); } catch (e) {}
     }
-
     function stopBGM() {
         pauseBGM();
-        try {
-            workoutBgmAudio.currentTime = 0;
-            restBgmAudio.currentTime = 0;
-        } catch (e) {}
+        try { workoutBgmAudio.currentTime = 0; restBgmAudio.currentTime = 0; } catch (e) {}
     }
 
     function updateTimerUI() {
         timeLeftDiv.innerText = timeLeft;
         let total = isWorkoutPhase ? 40 : 20;
         let percentage = Math.max(0, (timeLeft / total) * 100);
-
         if (isWorkoutPhase) {
             timerCircleDiv.style.background = `conic-gradient(var(--primary) ${percentage}%, #333 0%)`;
             phaseTextDiv.innerText = "WORKOUT";
@@ -575,19 +523,16 @@
         calorieDisplay.innerText = `累計消費: ${accumulatedCalories.toFixed(1)} kcal`;
     }
     
-    // ストリーク(連続日数)管理
     function getStreak() {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
         let lastDateStr = localStorage.getItem('last_workout_date');
         let currentStreak = parseInt(localStorage.getItem('workout_streak') || '0', 10);
-        
         if (lastDateStr === todayStr) return currentStreak;
         
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()+1}-${yesterday.getDate()}`;
-        
         if (lastDateStr === yesterdayStr) return currentStreak + 1;
         return 1;
     }
@@ -615,7 +560,6 @@ ${ex.desc}`;
         } else {
             nextNameDiv.innerText = `NEXT: なし（最後です！）`;
         }
-
         updateTimerUI();
         switchBGM(true);
         speak(`${ex.name}、スタート！ ${ex.name}。${ex.desc}`);
@@ -664,13 +608,8 @@ ${ex.desc}`;
         }, 1000);
     }
 
-    // スキップボタンの処理
     skipBtn.addEventListener('click', () => {
-        if(isPaused) {
-            isPaused = false;
-            pauseBtn.innerText = "一時停止";
-        }
-        
+        if(isPaused) { isPaused = false; pauseBtn.innerText = "一時停止"; }
         try { window.speechSynthesis.cancel(); } catch (e) {}
 
         if (isWorkoutPhase) {
@@ -687,8 +626,7 @@ ${ex.desc}`;
                 let nextEx = selectedExercises[currentExerciseIndex + 1];
                 speak(`スキップしました。休憩です。次は、${nextEx.name}です。`);
             } else {
-                finishWorkoutSession();
-                return;
+                finishWorkoutSession(); return;
             }
         } else {
             let timeSpent = 20 - timeLeft;
@@ -699,11 +637,9 @@ ${ex.desc}`;
                 speak("スキップしました。");
                 setupCurrentWorkout();
             } else {
-                finishWorkoutSession();
-                return;
+                finishWorkoutSession(); return;
             }
         }
-        
         if(timerId) clearInterval(timerId);
         startTimer();
     });
@@ -711,21 +647,17 @@ ${ex.desc}`;
     function finishWorkoutSession() {
         const total = accumulatedCalories.toFixed(1);
         saveWorkoutRecord(total, selectedExercises.map(e => e.name));
-        
         const streak = getStreak();
         saveStreak(streak);
         
         let streakMsg = streak > 1 ? `${streak}日連続達成です！素晴らしい継続力ですね！` : `今日のワークアウト完了です！`;
-        
         speak(`お疲れ様でした！今日も素晴らしい頑張りでしたね！ ${streakMsg} 総消費カロリーは、約${Math.round(accumulatedCalories)}キロカロリーです。明日も頑張りましょう！`);
-        
-        alert(`🎉 ワークアウト完了！お疲れ様でした！
+        alert(`🎉 ワークアウト完了！
 
 🔥 ${streak}日連続達成中！
 総消費カロリー: 約 ${total} kcal
 
-記録を保存しました。ゆっくり休んでください。`);
-        
+記録を保存しました。`);
         stopWorkout();
     }
 
@@ -733,7 +665,6 @@ ${ex.desc}`;
         const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
         const now = new Date();
         const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        
         history.unshift({ date: dateStr, calories: totalKcal, exercises: names });
         localStorage.setItem('workout_history', JSON.stringify(history));
         renderHistory();
@@ -742,12 +673,10 @@ ${ex.desc}`;
     function renderHistory() {
         const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
         historyListContainer.innerHTML = '';
-
         if (history.length === 0) {
             historyListContainer.innerHTML = '<p style="color:var(--text-muted); text-align:center; font-size:13px;">履歴はまだありません</p>';
             return;
         }
-
         history.forEach(item => {
             const card = document.createElement('div');
             card.className = 'history-card';
@@ -756,7 +685,7 @@ ${ex.desc}`;
                     <span>${item.date}</span>
                     <span>${item.calories} kcal</span>
                 </div>
-                <div class="history-items">${item.exercises.join(', ')}</div>
+                <div class="history-items">${item.exercises.join('、')}</div>
             `;
             historyListContainer.appendChild(card);
         });
@@ -771,19 +700,37 @@ ${ex.desc}`;
         }
     });
 
-    finalStartBtn.addEventListener('click', () => {
-        currentExerciseIndex = 0;
-        accumulatedCalories = 0;
-        isPaused = false;
-        pauseBtn.innerText = "一時停止";
+    // CSV保存機能
+    exportCsvBtn.addEventListener('click', () => {
+        const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
+        if (history.length === 0) {
+            alert("保存する履歴がありません。");
+            return;
+        }
+        // BOMを付与してExcelやスプレッドシートでの文字化けを防止
+        let csv = "﻿日時,消費カロリー(kcal),実施種目
+";
+        history.forEach(item => {
+            const exercises = `"${item.exercises.join('、')}"`; // カンマ対策でダブルクォートで囲む
+            csv += `${item.date},${item.calories},${exercises}
+`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "workout_history.csv";
+        link.click();
+    });
 
+    finalStartBtn.addEventListener('click', () => {
+        currentExerciseIndex = 0; accumulatedCalories = 0; isPaused = false;
+        pauseBtn.innerText = "一時停止";
         reorderScreen.style.display = 'none';
         workoutScreen.style.display = 'block';
         
         let currentStreak = getStreak();
         if(currentStreak > 0) {
-            streakDisplay.style.display = "inline-block";
-            streakDisplay.innerText = `🔥 ${currentStreak}日目`;
+            streakDisplay.style.display = "inline-block"; streakDisplay.innerText = `🔥 ${currentStreak}日目`;
         } else {
             streakDisplay.style.display = "none";
         }
@@ -796,35 +743,23 @@ ${ex.desc}`;
     pauseBtn.addEventListener('click', () => {
         isPaused = !isPaused;
         if (isPaused) {
-            pauseBtn.innerText = "再開";
-            pauseBGM();
-            speak("一時停止しました");
-            releaseWakeLock();
+            pauseBtn.innerText = "再開"; pauseBGM(); speak("一時停止しました"); releaseWakeLock();
         } else {
-            pauseBtn.innerText = "一時停止";
-            if (bgmEnableCheck.checked) switchBGM(isWorkoutPhase);
-            speak("再開します");
-            requestWakeLock();
+            pauseBtn.innerText = "一時停止"; if (bgmEnableCheck.checked) switchBGM(isWorkoutPhase); speak("再開します"); requestWakeLock();
         }
     });
 
     stopBtn.addEventListener('click', () => {
-        if (confirm("ワークアウトを終了して最初に戻りますか？")) {
-            stopWorkout();
-        }
+        if (confirm("ワークアウトを終了して最初に戻りますか？")) stopWorkout();
     });
 
     function stopWorkout() {
         if (timerId) clearInterval(timerId);
         timerId = null;
         try { window.speechSynthesis.cancel(); } catch (e) {}
-        stopBGM();
-        releaseWakeLock();
-
-        workoutScreen.style.display = 'none';
-        selectionScreen.style.display = 'block';
-        isPaused = false;
-        pauseBtn.innerText = "一時停止";
+        stopBGM(); releaseWakeLock();
+        workoutScreen.style.display = 'none'; selectionScreen.style.display = 'block';
+        isPaused = false; pauseBtn.innerText = "一時停止";
         renderHistory();
     }
 
