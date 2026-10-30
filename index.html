@@ -9,7 +9,7 @@
             --primary: #FF5722;
             --primary-dark: #E64A19;
             --rest: #4CAF50;
-            --rest-dark: #388E3C;
+            --prep: #FFEB3B;
             --bg: #121212;
             --card-bg: #1E1E1E;
             --card-bg-light: #2A2A2A;
@@ -66,10 +66,8 @@
             border: 1px solid #FF0000;
             border-radius: 4px;
         }
-        .youtube-link:hover {
-            background: #FF0000;
-            color: #FFF;
-        }
+        .youtube-link:hover { background: #FF0000; color: #FFF; }
+        
         .start-btn {
             width: 100%;
             padding: 15px;
@@ -85,10 +83,7 @@
             bottom: 20px;
             z-index: 10;
         }
-        .start-btn:disabled {
-            background-color: #555;
-            cursor: not-allowed;
-        }
+        .start-btn:disabled { background-color: #555; cursor: not-allowed; }
         
         .reorder-item {
             display: flex; align-items: center; justify-content: space-between;
@@ -159,17 +154,19 @@
             line-height: 1.5;
             white-space: pre-wrap;
         }
-        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;}
         .ctrl-btn {
             padding: 12px 10px;
-            font-size: 15px;
+            font-size: 14px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
             flex: 1;
+            min-width: 75px;
         }
         .btn-pause { background: #FFC107; color: #000; }
+        .btn-video { background: #E91E63; color: #FFF; }
         .btn-skip { background: #2196F3; color: #FFF; }
         .btn-stop { background: #F44336; color: #FFF; }
         
@@ -193,70 +190,88 @@
             font-size: 13px;
         }
         .history-header {
-            display: flex;
-            justify-content: space-between;
-            color: #FFC107;
-            font-weight: bold;
-            margin-bottom: 5px;
+            display: flex; justify-content: space-between; color: #FFC107; font-weight: bold; margin-bottom: 5px;
         }
         .history-items {
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .clear-btn {
-            background: #555;
-            color: #FFF;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .btn-green { background: #4CAF50; }
+        .btn-green { background: #4CAF50; color:#FFF; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;}
         .btn-green:hover { background: #45a049; }
+        
+        /* フォーム系要素 */
+        input[type="text"], select {
+            padding: 8px; border-radius: 4px; border: 1px solid #555;
+            background: #1E1E1E; color: #FFF; font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
+<!-- 1. 選択画面 -->
 <div class="container" id="selection-screen">
-    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v4</span></h1>
-    <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
+    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v5</span></h1>
     
+    <!-- プリセット呼び出し -->
     <div class="card-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <label>設定体重: <b>100 kg</b> (固定)</label>
-            <label><input type="checkbox" id="bgm-enable"> BGMオン</label>
+        <h3 style="margin-top:0; font-size:16px;">プリセット (お気に入り) 呼び出し</h3>
+        <div id="preset-buttons" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">
+            <!-- JSでボタン生成 -->
         </div>
     </div>
 
-    <!-- 履歴パネル (CSVエクスポート追加) -->
+    <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
+    
+    <div class="card-panel" style="display:flex; justify-content:space-between; align-items:center;">
+        <label>設定体重: <b>100 kg</b></label>
+        <label><input type="checkbox" id="bgm-enable"> BGMオン</label>
+    </div>
+
+    <!-- 履歴パネル -->
     <div class="card-panel" id="history-section">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
             <h3 style="margin:0; font-size:16px;">過去のワークアウト履歴</h3>
             <div>
-                <button class="clear-btn btn-green" id="export-csv-btn" style="margin-right: 5px;">CSV保存</button>
-                <button class="clear-btn" id="clear-history-btn">履歴消去</button>
+                <button class="btn-green" id="export-csv-btn" style="font-size:12px; margin-right:5px;">CSV保存</button>
+                <button class="btn-green" id="clear-history-btn" style="background:#555; font-size:12px;">履歴消去</button>
             </div>
         </div>
         <div class="history-list" id="history-list-container"></div>
     </div>
 
     <div id="workout-list"></div>
-    <button class="start-btn" id="to-reorder-btn" disabled>次へ (順番変更)</button>
+    <button class="start-btn" id="to-reorder-btn" disabled>次へ (順番確認・保存)</button>
 </div>
 
+<!-- 2. 順番変更＆プリセット保存画面 -->
 <div class="container" id="reorder-screen">
-    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">v4</span></h1>
-    <p style="text-align:center;">矢印ボタンで種目の順番を入れ替えることができます</p>
+    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">v5</span></h1>
+    
+    <!-- プリセット保存 -->
+    <div class="card-panel">
+        <h3 style="margin-top:0; font-size:15px;">この構成をプリセットに保存</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <input type="text" id="preset-name" placeholder="プリセット名 (例: 朝トレ)" style="flex:1; min-width:140px;">
+            <select id="preset-slot">
+                <option value="0">枠1</option>
+                <option value="1">枠2</option>
+                <option value="2">枠3</option>
+                <option value="3">枠4</option>
+                <option value="4">枠5</option>
+            </select>
+            <button class="btn-green" id="save-preset-btn">保存</button>
+        </div>
+    </div>
+
+    <p style="text-align:center; font-size:13px; color:var(--text-muted);">矢印ボタンで順番を入れ替えられます</p>
     <div class="card-panel" id="reorder-list"></div>
+    
     <div style="display:flex; gap:10px; margin-top: 20px;">
         <button class="ctrl-btn btn-pause" id="back-to-selection-btn" style="flex:1;">戻る</button>
         <button class="start-btn" id="final-start-btn" style="flex:2; margin-top:0;">ワークアウト開始</button>
     </div>
 </div>
 
+<!-- 3. ワークアウト画面 -->
 <div class="container" id="workout-screen">
     <div class="current-workout" id="current-name">準備中...</div>
     <div class="next-workout" id="next-name"></div>
@@ -276,6 +291,7 @@
     
     <div class="controls">
         <button class="ctrl-btn btn-pause" id="pause-btn">一時停止</button>
+        <button class="ctrl-btn btn-video" id="video-btn">🎥 動画</button>
         <button class="ctrl-btn btn-skip" id="skip-btn">スキップ ⏭</button>
         <button class="ctrl-btn btn-stop" id="stop-btn">終了</button>
     </div>
@@ -288,6 +304,7 @@
     const WEIGHT_KG = 100;
     const REST_CALORIES = 1.5 * WEIGHT_KG * (20 / 3600) * 1.05;
 
+    // ▼ 【種目の追加・削除】は、この allWorkouts 配列の中身を書き換えるだけで対応可能です！
     const allWorkouts = [
         { category: "脚（下半身）", name: "ヒップリフト", mets: 3.5, desc: "息を吐きながら、かかとで床を押すようにお尻をゆっくり持ち上げます。肩から膝が一直線になる位置で1〜2秒キープし、お尻をキュッと締めます。息を吸いながらゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=ヒップリフト+やり方" },
         { category: "脚（下半身）", name: "ワイドスクワット", mets: 3.5, desc: "息を吸いながら、膝がつま先と同じ方向を向くように意識して、お尻を真下に沈めます。太ももが床と平行になる手前で止め、かかとで踏み込んで立ち上がります。", url: "https://www.youtube.com/results?search_query=ワイドスクワット+やり方" },
@@ -321,14 +338,17 @@
         { category: "背中", name: "プランク・ロウ", mets: 8.0, desc: "腕立て伏せの姿勢から、体幹を固定したまま右手の肘を天井に向けて引き上げます。下ろして次は左手の肘を引き上げます。", url: "https://www.youtube.com/results?search_query=プランクロウ+やり方" }
     ];
 
+    let selectedIndices = []; // 選択順序を保持する配列
     let selectedExercises = [];
     let currentExerciseIndex = 0;
     let timerId = null;
-    let timeLeft = 40;
-    let isWorkoutPhase = true;
+    let timeLeft = 0;
+    let isPrepPhase = false; // 準備フェーズ(20秒)かどうかのフラグ
+    let isWorkoutPhase = false;
     let isPaused = false;
     let accumulatedCalories = 0;
     let wakeLock = null;
+    let presets = JSON.parse(localStorage.getItem('workout_presets')) || [null, null, null, null, null];
 
     // DOM
     const selectionScreen = document.getElementById('selection-screen');
@@ -351,14 +371,57 @@
     const descriptionBox = document.getElementById('description-text');
     const calorieDisplay = document.getElementById('calorie-display');
     const streakDisplay = document.getElementById('streak-display');
+    
+    // 操作ボタン群
     const pauseBtn = document.getElementById('pause-btn');
+    const videoBtn = document.getElementById('video-btn');
     const skipBtn = document.getElementById('skip-btn');
     const stopBtn = document.getElementById('stop-btn');
+    
     const historyListContainer = document.getElementById('history-list-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
     const exportCsvBtn = document.getElementById('export-csv-btn');
 
-    // リスト作成
+    // 1. プリセット関連関数
+    function renderPresetButtons() {
+        const container = document.getElementById('preset-buttons');
+        container.innerHTML = '';
+        presets.forEach((p, idx) => {
+            let btn = document.createElement('button');
+            btn.className = 'ctrl-btn ' + (p ? 'btn-green' : '');
+            btn.style.background = p ? '#4CAF50' : '#555';
+            btn.style.color = '#FFF';
+            btn.innerText = p ? p.name : `枠${idx+1} (未登録)`;
+            btn.disabled = !p;
+            btn.onclick = () => loadPreset(idx);
+            container.appendChild(btn);
+        });
+    }
+
+    function loadPreset(idx) {
+        if(!presets[idx]) return;
+        selectedIndices = [...presets[idx].indices];
+        // チェックボックスの状態を同期
+        document.querySelectorAll('#workout-list input[type="checkbox"]').forEach(cb => {
+            cb.checked = selectedIndices.includes(parseInt(cb.value));
+        });
+        updateSelectionUI();
+    }
+
+    document.getElementById('save-preset-btn').addEventListener('click', () => {
+        let name = document.getElementById('preset-name').value.trim();
+        let slot = parseInt(document.getElementById('preset-slot').value);
+        if(!name) name = `プリセット ${slot+1}`;
+        
+        // 現在の selectedExercises の順序でインデックスを保存
+        let indices = selectedExercises.map(ex => allWorkouts.indexOf(ex));
+        presets[slot] = { name: name, indices: indices };
+        localStorage.setItem('workout_presets', JSON.stringify(presets));
+        alert(`「${name}」を枠${slot+1}に保存しました。`);
+        renderPresetButtons();
+    });
+
+    // 2. リスト作成 (選択画面)
     let currentCategory = "";
     allWorkouts.forEach((wo, index) => {
         if(wo.category !== currentCategory) {
@@ -376,7 +439,17 @@
         checkbox.type = 'checkbox';
         checkbox.id = 'wo-' + index;
         checkbox.value = index;
-        checkbox.addEventListener('change', updateSelection);
+        
+        // 選択された順序を保持するロジック
+        checkbox.addEventListener('change', (e) => {
+            let val = parseInt(e.target.value);
+            if(e.target.checked) {
+                if(!selectedIndices.includes(val)) selectedIndices.push(val);
+            } else {
+                selectedIndices = selectedIndices.filter(i => i !== val);
+            }
+            updateSelectionUI();
+        });
 
         let label = document.createElement('label');
         label.htmlFor = 'wo-' + index;
@@ -394,10 +467,9 @@
         workoutListDiv.appendChild(itemDiv);
     });
 
-    function updateSelection() {
-        const checkboxes = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
-        selectCountSpan.innerText = checkboxes.length;
-        if (checkboxes.length === 10) {
+    function updateSelectionUI() {
+        selectCountSpan.innerText = selectedIndices.length;
+        if (selectedIndices.length === 10) {
             toReorderBtn.disabled = false;
             document.querySelectorAll('#workout-list input[type="checkbox"]:not(:checked)').forEach(cb => cb.disabled = true);
         } else {
@@ -405,6 +477,23 @@
             document.querySelectorAll('#workout-list input[type="checkbox"]').forEach(cb => cb.disabled = false);
         }
     }
+
+    // 順番変更画面へ
+    toReorderBtn.addEventListener('click', () => {
+        // 選択順に配列を作成
+        selectedExercises = selectedIndices.map(i => allWorkouts[i]);
+        selectionScreen.style.display = 'none';
+        reorderScreen.style.display = 'block';
+        renderReorderList();
+    });
+
+    // 選択画面に戻る
+    backToSelectionBtn.addEventListener('click', () => {
+        // 順番変更画面での変更を選択順（selectedIndices）に反映
+        selectedIndices = selectedExercises.map(ex => allWorkouts.indexOf(ex));
+        reorderScreen.style.display = 'none';
+        selectionScreen.style.display = 'block';
+    });
 
     function renderReorderList() {
         reorderListDiv.innerHTML = '';
@@ -440,37 +529,18 @@
         });
     }
 
-    toReorderBtn.addEventListener('click', () => {
-        const checked = document.querySelectorAll('#workout-list input[type="checkbox"]:checked');
-        selectedExercises = Array.from(checked).map(cb => allWorkouts[cb.value]);
-        selectionScreen.style.display = 'none';
-        reorderScreen.style.display = 'block';
-        renderReorderList();
-    });
-
-    backToSelectionBtn.addEventListener('click', () => {
-        reorderScreen.style.display = 'none';
-        selectionScreen.style.display = 'block';
-    });
-
+    // Wake Lock
     async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-        } catch (err) {}
+        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     }
-    
     function releaseWakeLock() {
-        if (wakeLock !== null) {
-            wakeLock.release().then(() => { wakeLock = null; });
-        }
+        if (wakeLock !== null) wakeLock.release().then(() => { wakeLock = null; });
     }
-    
     document.addEventListener('visibilitychange', async () => {
         if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
     });
 
+    // BGM & 音声
     function speak(text) {
         try {
             if (!('speechSynthesis' in window)) return;
@@ -509,9 +579,15 @@
 
     function updateTimerUI() {
         timeLeftDiv.innerText = timeLeft;
-        let total = isWorkoutPhase ? 40 : 20;
+        let total = isWorkoutPhase ? 40 : 20; // 準備フェーズも20秒
         let percentage = Math.max(0, (timeLeft / total) * 100);
-        if (isWorkoutPhase) {
+        
+        if (isPrepPhase) {
+            // 準備フェーズ UI
+            timerCircleDiv.style.background = `conic-gradient(var(--prep) ${percentage}%, #333 0%)`;
+            phaseTextDiv.innerText = "GET READY";
+            phaseTextDiv.style.color = "var(--prep)";
+        } else if (isWorkoutPhase) {
             timerCircleDiv.style.background = `conic-gradient(var(--primary) ${percentage}%, #333 0%)`;
             phaseTextDiv.innerText = "WORKOUT";
             phaseTextDiv.style.color = "var(--primary)";
@@ -523,6 +599,7 @@
         calorieDisplay.innerText = `累計消費: ${accumulatedCalories.toFixed(1)} kcal`;
     }
     
+    // ストリーク
     function getStreak() {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
@@ -536,7 +613,6 @@
         if (lastDateStr === yesterdayStr) return currentStreak + 1;
         return 1;
     }
-    
     function saveStreak(newStreak) {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
@@ -546,12 +622,15 @@
 
     function setupCurrentWorkout() {
         isWorkoutPhase = true;
+        isPrepPhase = false;
         timeLeft = 40;
         let ex = selectedExercises[currentExerciseIndex];
         const itemCal = ex.mets * WEIGHT_KG * (40 / 3600) * 1.05;
 
         currentNameDiv.innerText = `${currentExerciseIndex + 1}/10: ${ex.name}`;
-        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal\n【ポイント】\n${ex.desc}`;
+        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal
+【ポイント】
+${ex.desc}`;
 
         if (currentExerciseIndex < 9) {
             nextNameDiv.innerText = `NEXT: ${selectedExercises[currentExerciseIndex + 1].name}`;
@@ -559,7 +638,7 @@
             nextNameDiv.innerText = `NEXT: なし（最後です！）`;
         }
         updateTimerUI();
-        switchBGM(true);
+        switchBGM(true); // ワークアウト用BGM
         speak(`${ex.name}、スタート！ ${ex.name}。${ex.desc}`);
     }
 
@@ -570,7 +649,17 @@
             timeLeft--;
             updateTimerUI();
 
-            if (isWorkoutPhase) {
+            if (isPrepPhase) {
+                // 準備フェーズ中の音声
+                if (timeLeft === 3) speak("3");
+                if (timeLeft === 2) speak("2");
+                if (timeLeft === 1) speak("1");
+
+                if (timeLeft <= 0) {
+                    setupCurrentWorkout();
+                }
+            } else if (isWorkoutPhase) {
+                // ワークアウト中
                 if (timeLeft === 20) speak("残り20秒です。半分経過しました！");
                 if (timeLeft === 3) speak("3");
                 if (timeLeft === 2) speak("2");
@@ -583,7 +672,7 @@
                     isWorkoutPhase = false;
                     timeLeft = 20;
                     updateTimerUI();
-                    switchBGM(false);
+                    switchBGM(false); // 休憩用BGM
 
                     if (currentExerciseIndex < 9) {
                         let nextEx = selectedExercises[currentExerciseIndex + 1];
@@ -593,6 +682,7 @@
                     }
                 }
             } else {
+                // 休憩中
                 if (timeLeft === 3) speak("3");
                 if (timeLeft === 2) speak("2");
                 if (timeLeft === 1) speak("1");
@@ -606,11 +696,24 @@
         }, 1000);
     }
 
+    // 🎥 動画ボタン処理 (一時停止してリンクを開く)
+    videoBtn.addEventListener('click', () => {
+        if(!isPaused) pauseBtn.click(); // 一時停止状態にする
+        let ex = selectedExercises[currentExerciseIndex];
+        if(ex && ex.url) {
+            window.open(ex.url, '_blank');
+        }
+    });
+
+    // スキップ処理
     skipBtn.addEventListener('click', () => {
         if(isPaused) { isPaused = false; pauseBtn.innerText = "一時停止"; }
         try { window.speechSynthesis.cancel(); } catch (e) {}
 
-        if (isWorkoutPhase) {
+        if (isPrepPhase) {
+            // 準備をスキップ
+            setupCurrentWorkout();
+        } else if (isWorkoutPhase) {
             let ex = selectedExercises[currentExerciseIndex];
             let timeSpent = 40 - timeLeft;
             accumulatedCalories += (ex.mets * WEIGHT_KG * (timeSpent / 3600) * 1.05);
@@ -650,7 +753,12 @@
         
         let streakMsg = streak > 1 ? `${streak}日連続達成です！素晴らしい継続力ですね！` : `今日のワークアウト完了です！`;
         speak(`お疲れ様でした！今日も素晴らしい頑張りでしたね！ ${streakMsg} 総消費カロリーは、約${Math.round(accumulatedCalories)}キロカロリーです。明日も頑張りましょう！`);
-        alert(`🎉 ワークアウト完了！\n\n🔥 ${streak}日連続達成中！\n総消費カロリー: 約 ${total} kcal\n\n記録を保存しました。`);
+        alert(`🎉 ワークアウト完了！
+
+🔥 ${streak}日連続達成中！
+総消費カロリー: 約 ${total} kcal
+
+記録を保存しました。`);
         stopWorkout();
     }
 
@@ -693,18 +801,16 @@
         }
     });
 
-    // CSV保存機能
     exportCsvBtn.addEventListener('click', () => {
         const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
-        if (history.length === 0) {
-            alert("保存する履歴がありません。");
-            return;
-        }
+        if (history.length === 0) { alert("保存する履歴がありません。"); return; }
         
-        let csv = "\uFEFF日時,消費カロリー(kcal),実施種目\n";
+        let csv = "﻿日時,消費カロリー(kcal),実施種目
+";
         history.forEach(item => {
             const exercises = `"${item.exercises.join('、')}"`;
-            csv += `${item.date},${item.calories},${exercises}\n`;
+            csv += `${item.date},${item.calories},${exercises}
+`;
         });
         
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -728,7 +834,23 @@
         }
         
         requestWakeLock();
-        setupCurrentWorkout();
+        
+        // --- 20秒の準備フェーズ開始 ---
+        isPrepPhase = true;
+        isWorkoutPhase = false;
+        timeLeft = 20;
+        let ex = selectedExercises[currentExerciseIndex];
+        
+        currentNameDiv.innerText = `まもなく開始: ${ex.name}`;
+        descriptionBox.innerText = `【準備してください】
+
+スマートフォンを置いて、最初の種目「${ex.name}」のポジションについてください。`;
+        nextNameDiv.innerText = `1/10: ${ex.name}`;
+        
+        updateTimerUI();
+        switchBGM(false); // 準備中は休憩用BGMを流す
+        speak(`ワークアウトを開始します。最初の種目は、${ex.name}です。準備してください。`);
+        
         startTimer();
     });
 
@@ -756,6 +878,7 @@
     }
 
     renderHistory();
+    renderPresetButtons();
 </script>
 </body>
 </html>
