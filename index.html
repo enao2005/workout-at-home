@@ -209,7 +209,7 @@
 
 <!-- 1. 選択画面 -->
 <div class="container" id="selection-screen">
-    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v5</span></h1>
+    <h1>10分間 ワークアウト <span style="font-size: 14px; color: #FFC107;">v6</span></h1>
     
     <!-- プリセット呼び出し -->
     <div class="card-panel">
@@ -222,7 +222,7 @@
     <p style="text-align:center;">10種目を選択してください（現在: <span id="select-count">0</span>/10）</p>
     
     <div class="card-panel" style="display:flex; justify-content:space-between; align-items:center;">
-        <label>設定体重: <b>100 kg</b></label>
+        <label>設定体重: <b>100 kg</b> (固定)</label>
         <label><input type="checkbox" id="bgm-enable"> BGMオン</label>
     </div>
 
@@ -244,7 +244,7 @@
 
 <!-- 2. 順番変更＆プリセット保存画面 -->
 <div class="container" id="reorder-screen">
-    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">v5</span></h1>
+    <h1>順番の確認・変更 <span style="font-size: 14px; color: #FFC107;">v6</span></h1>
     
     <!-- プリセット保存 -->
     <div class="card-panel">
@@ -304,7 +304,6 @@
     const WEIGHT_KG = 100;
     const REST_CALORIES = 1.5 * WEIGHT_KG * (20 / 3600) * 1.05;
 
-    // ▼ 【種目の追加・削除】は、この allWorkouts 配列の中身を書き換えるだけで対応可能です！
     const allWorkouts = [
         { category: "脚（下半身）", name: "ヒップリフト", mets: 3.5, desc: "息を吐きながら、かかとで床を押すようにお尻をゆっくり持ち上げます。肩から膝が一直線になる位置で1〜2秒キープし、お尻をキュッと締めます。息を吸いながらゆっくり下ろします。", url: "https://www.youtube.com/results?search_query=ヒップリフト+やり方" },
         { category: "脚（下半身）", name: "ワイドスクワット", mets: 3.5, desc: "息を吸いながら、膝がつま先と同じ方向を向くように意識して、お尻を真下に沈めます。太ももが床と平行になる手前で止め、かかとで踏み込んで立ち上がります。", url: "https://www.youtube.com/results?search_query=ワイドスクワット+やり方" },
@@ -338,31 +337,41 @@
         { category: "背中", name: "プランク・ロウ", mets: 8.0, desc: "腕立て伏せの姿勢から、体幹を固定したまま右手の肘を天井に向けて引き上げます。下ろして次は左手の肘を引き上げます。", url: "https://www.youtube.com/results?search_query=プランクロウ+やり方" }
     ];
 
-    let selectedIndices = []; // 選択順序を保持する配列
+    let selectedIndices = [];
     let selectedExercises = [];
     let currentExerciseIndex = 0;
     let timerId = null;
     let timeLeft = 0;
-    let isPrepPhase = false; // 準備フェーズ(20秒)かどうかのフラグ
+    let isPrepPhase = false;
     let isWorkoutPhase = false;
     let isPaused = false;
     let accumulatedCalories = 0;
     let wakeLock = null;
-    let presets = JSON.parse(localStorage.getItem('workout_presets')) || [null, null, null, null, null];
+    
+    // プリセットデータの安全な読み込み
+    let presets = [null, null, null, null, null];
+    try {
+        const saved = JSON.parse(localStorage.getItem('workout_presets'));
+        if (Array.isArray(saved)) presets = saved;
+    } catch(e) { console.error("Preset load error", e); }
 
-    // DOM
+    // DOM Elements
     const selectionScreen = document.getElementById('selection-screen');
     const reorderScreen = document.getElementById('reorder-screen');
     const workoutScreen = document.getElementById('workout-screen');
+    
     const workoutListDiv = document.getElementById('workout-list');
     const selectCountSpan = document.getElementById('select-count');
     const toReorderBtn = document.getElementById('to-reorder-btn');
+    
     const reorderListDiv = document.getElementById('reorder-list');
     const finalStartBtn = document.getElementById('final-start-btn');
     const backToSelectionBtn = document.getElementById('back-to-selection-btn');
+    
     const bgmEnableCheck = document.getElementById('bgm-enable');
     const workoutBgmAudio = document.getElementById('workout-bgm');
     const restBgmAudio = document.getElementById('rest-bgm');
+    
     const currentNameDiv = document.getElementById('current-name');
     const nextNameDiv = document.getElementById('next-name');
     const phaseTextDiv = document.getElementById('phase-text');
@@ -440,7 +449,6 @@
         checkbox.id = 'wo-' + index;
         checkbox.value = index;
         
-        // 選択された順序を保持するロジック
         checkbox.addEventListener('change', (e) => {
             let val = parseInt(e.target.value);
             if(e.target.checked) {
@@ -478,18 +486,14 @@
         }
     }
 
-    // 順番変更画面へ
     toReorderBtn.addEventListener('click', () => {
-        // 選択順に配列を作成
         selectedExercises = selectedIndices.map(i => allWorkouts[i]);
         selectionScreen.style.display = 'none';
         reorderScreen.style.display = 'block';
         renderReorderList();
     });
 
-    // 選択画面に戻る
     backToSelectionBtn.addEventListener('click', () => {
-        // 順番変更画面での変更を選択順（selectedIndices）に反映
         selectedIndices = selectedExercises.map(ex => allWorkouts.indexOf(ex));
         reorderScreen.style.display = 'none';
         selectionScreen.style.display = 'block';
@@ -529,7 +533,6 @@
         });
     }
 
-    // Wake Lock
     async function requestWakeLock() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     }
@@ -540,7 +543,6 @@
         if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
     });
 
-    // BGM & 音声
     function speak(text) {
         try {
             if (!('speechSynthesis' in window)) return;
@@ -583,7 +585,6 @@
         let percentage = Math.max(0, (timeLeft / total) * 100);
         
         if (isPrepPhase) {
-            // 準備フェーズ UI
             timerCircleDiv.style.background = `conic-gradient(var(--prep) ${percentage}%, #333 0%)`;
             phaseTextDiv.innerText = "GET READY";
             phaseTextDiv.style.color = "var(--prep)";
@@ -599,7 +600,6 @@
         calorieDisplay.innerText = `累計消費: ${accumulatedCalories.toFixed(1)} kcal`;
     }
     
-    // ストリーク
     function getStreak() {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
@@ -628,9 +628,7 @@
         const itemCal = ex.mets * WEIGHT_KG * (40 / 3600) * 1.05;
 
         currentNameDiv.innerText = `${currentExerciseIndex + 1}/10: ${ex.name}`;
-        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal
-【ポイント】
-${ex.desc}`;
+        descriptionBox.innerText = `【目安消費】 約 ${itemCal.toFixed(1)} kcal\n【ポイント】\n${ex.desc}`;
 
         if (currentExerciseIndex < 9) {
             nextNameDiv.innerText = `NEXT: ${selectedExercises[currentExerciseIndex + 1].name}`;
@@ -650,16 +648,11 @@ ${ex.desc}`;
             updateTimerUI();
 
             if (isPrepPhase) {
-                // 準備フェーズ中の音声
                 if (timeLeft === 3) speak("3");
                 if (timeLeft === 2) speak("2");
                 if (timeLeft === 1) speak("1");
-
-                if (timeLeft <= 0) {
-                    setupCurrentWorkout();
-                }
+                if (timeLeft <= 0) setupCurrentWorkout();
             } else if (isWorkoutPhase) {
-                // ワークアウト中
                 if (timeLeft === 20) speak("残り20秒です。半分経過しました！");
                 if (timeLeft === 3) speak("3");
                 if (timeLeft === 2) speak("2");
@@ -682,7 +675,6 @@ ${ex.desc}`;
                     }
                 }
             } else {
-                // 休憩中
                 if (timeLeft === 3) speak("3");
                 if (timeLeft === 2) speak("2");
                 if (timeLeft === 1) speak("1");
@@ -711,7 +703,6 @@ ${ex.desc}`;
         try { window.speechSynthesis.cancel(); } catch (e) {}
 
         if (isPrepPhase) {
-            // 準備をスキップ
             setupCurrentWorkout();
         } else if (isWorkoutPhase) {
             let ex = selectedExercises[currentExerciseIndex];
@@ -753,12 +744,7 @@ ${ex.desc}`;
         
         let streakMsg = streak > 1 ? `${streak}日連続達成です！素晴らしい継続力ですね！` : `今日のワークアウト完了です！`;
         speak(`お疲れ様でした！今日も素晴らしい頑張りでしたね！ ${streakMsg} 総消費カロリーは、約${Math.round(accumulatedCalories)}キロカロリーです。明日も頑張りましょう！`);
-        alert(`🎉 ワークアウト完了！
-
-🔥 ${streak}日連続達成中！
-総消費カロリー: 約 ${total} kcal
-
-記録を保存しました。`);
+        alert(`🎉 ワークアウト完了！\n\n🔥 ${streak}日連続達成中！\n総消費カロリー: 約 ${total} kcal\n\n記録を保存しました。`);
         stopWorkout();
     }
 
@@ -805,12 +791,10 @@ ${ex.desc}`;
         const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
         if (history.length === 0) { alert("保存する履歴がありません。"); return; }
         
-        let csv = "﻿日時,消費カロリー(kcal),実施種目
-";
+        let csv = "\uFEFF日時,消費カロリー(kcal),実施種目\n";
         history.forEach(item => {
             const exercises = `"${item.exercises.join('、')}"`;
-            csv += `${item.date},${item.calories},${exercises}
-`;
+            csv += `${item.date},${item.calories},${exercises}\n`;
         });
         
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -842,9 +826,7 @@ ${ex.desc}`;
         let ex = selectedExercises[currentExerciseIndex];
         
         currentNameDiv.innerText = `まもなく開始: ${ex.name}`;
-        descriptionBox.innerText = `【準備してください】
-
-スマートフォンを置いて、最初の種目「${ex.name}」のポジションについてください。`;
+        descriptionBox.innerText = `【準備してください】\n\nスマートフォンを置いて、最初の種目「${ex.name}」のポジションについてください。`;
         nextNameDiv.innerText = `1/10: ${ex.name}`;
         
         updateTimerUI();
